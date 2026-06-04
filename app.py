@@ -22,7 +22,7 @@ if not st.session_state.authenticated:
     with col2:
         with st.container(border=True):
             st.info("💡 首次使用？直接输入你想要的专属 ID 即可自动注册！")
-            username = st.text_input("👤 你的专属 ID", placeholder="例如: Jelly")
+            username = st.text_input("👤 你的专属 ID", placeholder="例如: Tom Dwan")
             if st.button("一键进入", use_container_width=True, type="primary"):
                 if username.strip() != "":
                     # 不再去核对密码，只要输入了名字就放行
