@@ -16,7 +16,7 @@ if "authenticated" not in st.session_state:
     st.session_state.authenticated = False
 
 if not st.session_state.authenticated:
-    st.markdown("<h2 style='text-align: center; margin-top: 100px;'>🔒 Jelly Poker 团队金库</h2>", unsafe_allow_html=True)
+    st.markdown("<h2 style='text-align: center; margin-top: 100px;'>🔒 Jelly Poker </h2>", unsafe_allow_html=True)
     col1, col2, col3 = st.columns([1, 2, 1])
     with col2:
         pwd = st.text_input("请输入访问密码", type="password", placeholder="输入暗号后按回车 ↵")
