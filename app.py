@@ -1,6 +1,7 @@
 import streamlit as st
 import pandas as pd
 import datetime
+import time
 import requests
 import json
 import gspread
@@ -252,4 +253,5 @@ with tab_entry:
             
             sheet.append_row([str(date), current_user, location, float(buy_in), int(entries), float(cashed), currency, float(profit_cny)])
             st.success("✅ 完美！比赛记录已安全存入谷歌云端。")
+            time.sleep(1.5)
             st.rerun()
