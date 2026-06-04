@@ -11,26 +11,26 @@ st.set_page_config(page_title="Jelly Poker Tracker", page_icon="🃏", layout="w
 
 CURRENCIES = ["CNY", "USD", "AUD", "VND", "KRW"]
 
-# ================= 1.5 真正的多用户登录系统 =================
+# ================= 1.5 极简无密码 ID 登录系统 =================
 if "authenticated" not in st.session_state:
     st.session_state.authenticated = False
     st.session_state.current_user = ""
 
 if not st.session_state.authenticated:
-    st.markdown("<h2 style='text-align: center; margin-top: 100px;'>🔒 Jelly Poker 专属金库</h2>", unsafe_allow_html=True)
+    st.markdown("<h2 style='text-align: center; margin-top: 100px;'>🃏 Jelly Poker 专属金库</h2>", unsafe_allow_html=True)
     col1, col2, col3 = st.columns([1, 2, 1])
     with col2:
         with st.container(border=True):
-            username = st.text_input("👤 用户名")
-            pwd = st.text_input("🔑 密码", type="password")
-            if st.button("登 录", use_container_width=True, type="primary"):
-                users_dict = st.secrets.get("users", {})
-                if username in users_dict and users_dict[username] == pwd:
+            st.info("💡 首次使用？直接输入你想要的专属 ID 即可自动注册！")
+            username = st.text_input("👤 你的专属 ID", placeholder="例如: Jelly")
+            if st.button("一键进入", use_container_width=True, type="primary"):
+                if username.strip() != "":
+                    # 不再去核对密码，只要输入了名字就放行
                     st.session_state.authenticated = True
-                    st.session_state.current_user = username
+                    st.session_state.current_user = username.strip()
                     st.rerun()
                 else:
-                    st.error("❌ 用户名或密码错误，请联系管理员分配账号！")
+                    st.error("❌ ID 不能为空！")
     st.stop()
 
 current_user = st.session_state.current_user
@@ -38,6 +38,7 @@ current_user = st.session_state.current_user
 # ================= 2. 连接谷歌云端数据库 =================
 @st.cache_resource
 def init_connection():
+    # 现在这里只需要谷歌钥匙了，不需要再配置账号密码
     creds_json = json.loads(st.secrets["google_credentials"])
     scopes = [
         "https://www.googleapis.com/auth/spreadsheets",
@@ -87,7 +88,7 @@ rates_cny_base, rates_usd_base = fetch_exchange_rates()
 
 # ================= 4. 侧边栏：个人身份、汇率 & 计算器 =================
 st.sidebar.markdown(f"## 👤 欢迎回来, **{current_user}**")
-if st.sidebar.button("🚪 退出登录"):
+if st.sidebar.button("🚪 退出登录 (切换账号)"):
     st.session_state.authenticated = False
     st.session_state.current_user = ""
     st.rerun()
@@ -136,7 +137,7 @@ with tab_entry:
         with col1:
             date = st.date_input("比赛时间", datetime.date.today())
             historical_locations = df["Location"].dropna().unique().tolist() if not df.empty else []
-            default_locations = ["GGPoker 线上"]
+            default_locations = ["GGPoker 线上", ]
             all_locations = list(dict.fromkeys(default_locations + historical_locations))
             
             location_choice = st.selectbox("赛事地点", ["👇 手动新增地点..."] + all_locations)
@@ -162,14 +163,12 @@ with tab_entry:
             profit_raw = cashed - (buy_in * entries)
             profit_cny = profit_raw * rates_cny_base[currency]
             
-            # 强制将记录绑定为当前登录的用户
             sheet.append_row([str(date), current_user, location, float(buy_in), int(entries), float(cashed), currency, float(profit_cny)])
             st.success(f"✅ 成功记录！该场净利润: ¥{profit_cny:,.2f} CNY")
             st.rerun()
 
 # ----------------- 标签页 B：数据看板与编辑表 -----------------
 with tab_dashboard:
-    # 核心隔离魔法：这里强制只筛选出属于当前登录人的数据
     display_df = df[df["Player"] == current_user].copy()
     
     if not display_df.empty:
@@ -206,7 +205,7 @@ with tab_dashboard:
             use_container_width=True,
             num_rows="dynamic",  
             hide_index=True,
-            disabled=["Profit_CNY", "Player"] # 禁止乱改自己的名字和利润
+            disabled=["Profit_CNY", "Player"] 
         )
         
         if st.button("💾 确认并覆盖保存修改至云端", type="primary"):
@@ -220,10 +219,8 @@ with tab_dashboard:
                 
             edited_df['Profit_CNY'] = edited_df.apply(recalc_profit, axis=1)
             
-            # 核心保护魔法：把别人的数据单独提取出来，和修改后的你的数据重新合并拼装，防止覆盖别人的心血！
             other_users_df = df[df["Player"] != current_user]
             final_df = pd.concat([other_users_df, edited_df], ignore_index=True)
-            # 保证列的顺序不会错乱
             final_df = final_df[["Date", "Player", "Location", "Buy_in", "Entries", "Cashed", "Currency", "Profit_CNY"]]
             
             sheet.clear()
