@@ -28,9 +28,8 @@ def init_connection():
 try:
     sheet = init_connection()
 except Exception as e:
-    st.error(f"⚠️ 无法连接到谷歌表格，请检查 Secrets 格式是否填写正确。")
+    st.error(f"⚠️ 真正的报错原因是: {str(e)}") # <--- 就改这一行
     st.stop()
-
 # 每次刷新网页时，从云端拉取最新数据
 records = sheet.get_all_records()
 if not records:
