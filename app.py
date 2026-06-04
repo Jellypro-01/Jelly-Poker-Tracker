@@ -71,7 +71,19 @@ if not records:
     df = pd.DataFrame(columns=["Date", "Player", "Location", "Buy_in", "Entries", "Cashed", "Currency", "Profit_CNY"])
 else:
     df = pd.DataFrame(records)
-
+records = sheet.get_all_records()
+if not records:
+    df = pd.DataFrame(columns=["Date", "Player", "Location", "Buy_in", "Entries", "Cashed", "Currency", "Profit_CNY"])
+else:
+    df = pd.DataFrame(records)
+    
+    # === 新增修复代码：强制将涉及金额和次数的列转换为数字类型 ===
+    numeric_columns = ["Buy_in", "Entries", "Cashed", "Profit_CNY"]
+    for col in numeric_columns:
+        if col in df.columns:
+            # pd.to_numeric 会把文本变成真正的数字，errors='coerce' 会把乱码变成空值，fillna(0) 把空值填成 0
+            df[col] = pd.to_numeric(df[col], errors='coerce').fillna(0)
+    # ==========================================================
 # 提取当前已有的所有玩家名字，去重并过滤空值
 existing_players = df["Player"].dropna().unique().tolist() if "Player" in df.columns else []
 
