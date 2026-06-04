@@ -202,7 +202,7 @@ with tab_dashboard:
 
         st.markdown("---")
         st.markdown("#### 📋 完整详细记录")
-        st.caption("💡 电脑端可双击直接修改，选中左侧方框按 Delete 键删除 (此处固定显示全部记录，防止误删)。")
+        st.caption("💡 双击直接修改，选中左侧方框按 Delete 键删除。修改买入或次数后，**利润不会立刻变化，点击下方【保存】按钮后系统会自动重算！**")
         edited_df = st.data_editor(
             display_df,
             use_container_width=True,
