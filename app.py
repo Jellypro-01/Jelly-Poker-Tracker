@@ -17,7 +17,7 @@ if "authenticated" not in st.session_state:
     st.session_state.current_user = ""
 
 if not st.session_state.authenticated:
-    st.markdown("<h2 style='text-align: center; margin-top: 100px;'>🃏 Jelly Poker 专属金库</h2>", unsafe_allow_html=True)
+    st.markdown("<h2 style='text-align: center; margin-top: 100px;'>🃏 Jelly Poker Dashboard</h2>", unsafe_allow_html=True)
     col1, col2, col3 = st.columns([1, 2, 1])
     with col2:
         with st.container(border=True):
