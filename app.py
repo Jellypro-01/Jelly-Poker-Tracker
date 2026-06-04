@@ -1,14 +1,15 @@
 import streamlit as st
 import pandas as pd
 import datetime
-import time
 import requests
 import json
 import gspread
 from google.oauth2.service_account import Credentials
+import time
 
 # ================= 1. 页面基础配置与高级 CSS 美化 =================
-st.set_page_config(page_title="Jelly Poker Tracker", page_icon="🃏", layout="wide", initial_sidebar_state="collapsed")
+# 修复点 1：将 initial_sidebar_state 改回 expanded (默认展开)
+st.set_page_config(page_title="Jelly Poker Tracker", page_icon="🃏", layout="wide", initial_sidebar_state="expanded")
 
 # 注入 CSS 魔法：全面提升高级感与移动端适配
 st.markdown("""
@@ -16,7 +17,7 @@ st.markdown("""
 /* 隐藏默认菜单和水印，提升沉浸感 */
 #MainMenu {visibility: hidden;}
 footer {visibility: hidden;}
-header {visibility: hidden;}
+/* 修复点 2：移除了隐藏 header 的代码，确保你能看到侧边栏的开关按钮 */
 
 /* 优化全局边距，让手机端不拥挤，PC端更紧凑 */
 .block-container {
@@ -57,7 +58,7 @@ if "authenticated" not in st.session_state:
 
 if not st.session_state.authenticated:
     st.markdown("<h1 style='text-align: center; margin-top: 15vh; font-size: 3rem;'>🃏 Jelly Poker</h1>", unsafe_allow_html=True)
-    st.markdown("<p style='text-align: center; color: #64748B; margin-bottom: 2rem;'>你的云端专属扑克资金管家</p>", unsafe_allow_html=True)
+    st.markdown("<p style='text-align: center; color: #64748B; margin-bottom: 2rem;'>你的云端专属扑克管家</p>", unsafe_allow_html=True)
     
     col1, col2, col3 = st.columns([1, 2, 1])
     with col2:
@@ -121,7 +122,7 @@ def fetch_exchange_rates():
 
 rates_cny_base, rates_usd_base = fetch_exchange_rates()
 
-# ================= 4. 侧边栏：聚合工具 (移动端收起，体验更好) =================
+# ================= 4. 侧边栏：聚合工具 =================
 st.sidebar.markdown(f"### 👤 {current_user}")
 if st.sidebar.button("🚪 切换账号", use_container_width=True):
     st.session_state.authenticated = False
@@ -130,7 +131,6 @@ if st.sidebar.button("🚪 切换账号", use_container_width=True):
 
 st.sidebar.markdown("---")
 
-# 使用 expander 把工具折叠起来，让手机端不被拉得很长
 with st.sidebar.expander("💱 汇率换算器", expanded=False):
     calc_amount = st.number_input("输入金额", min_value=0.0, value=1000.0, step=100.0, label_visibility="collapsed")
     col1, col2 = st.columns(2)
@@ -168,7 +168,6 @@ with tab_dashboard:
         itm_count = len(display_df[display_df["Cashed"] > 0])
         itm_rate = (itm_count / total_tourneys * 100) if total_tourneys > 0 else 0
         
-        # 使用 Streamlit 原生的高级 Metric 组件，手机端会自动完美堆叠
         m1, m2, m3 = st.columns(3)
         m1.metric("参赛总数", f"{total_tourneys} 场")
         m2.metric("总净利润 (RMB)", f"¥{total_profit_cny:,.2f}")
@@ -212,6 +211,7 @@ with tab_dashboard:
             updated_data = [final_df.columns.values.tolist()] + final_df.values.tolist()
             sheet.update(values=updated_data, range_name="A1")
             st.success("✅ 数据已同步至云端！")
+            time.sleep(1.5)
             st.rerun()
             
     else:
@@ -227,7 +227,7 @@ with tab_entry:
             currency = st.selectbox("结算币种", CURRENCIES)
         with col2:
             historical_locations = df["Location"].dropna().unique().tolist() if not df.empty else []
-            default_locations = ["GGPoker 线上"]
+            default_locations = ["GGPoker 线上", "CoinPoker 线上"]
             all_locations = list(dict.fromkeys(default_locations + historical_locations))
             location_choice = st.selectbox("赛事地点", ["👇 手动新增地点..."] + all_locations)
             new_location = st.text_input("✍️ 新增地点", placeholder="若不在列表中，请在此输入")
