@@ -8,25 +8,17 @@ from google.oauth2.service_account import Credentials
 import time
 
 # ================= 1. 页面基础配置与高级 CSS 美化 =================
-# 修复点 1：将 initial_sidebar_state 改回 expanded (默认展开)
 st.set_page_config(page_title="Jelly Poker Tracker", page_icon="🃏", layout="wide", initial_sidebar_state="expanded")
 
-# 注入 CSS 魔法：全面提升高级感与移动端适配
 st.markdown("""
 <style>
-/* 隐藏默认菜单和水印，提升沉浸感 */
 #MainMenu {visibility: hidden;}
 footer {visibility: hidden;}
-/* 修复点 2：移除了隐藏 header 的代码，确保你能看到侧边栏的开关按钮 */
-
-/* 优化全局边距，让手机端不拥挤，PC端更紧凑 */
 .block-container {
     padding-top: 2rem !important;
     padding-bottom: 2rem !important;
     max-width: 1200px;
 }
-
-/* 统一输入框、按钮的圆角设计 (Apple 风格) */
 div[data-baseweb="input"] > div, div[data-baseweb="select"] > div {
     border-radius: 10px !important;
 }
@@ -34,8 +26,6 @@ button {
     border-radius: 10px !important;
     font-weight: 600 !important;
 }
-
-/* 美化顶部的数据看板字体 */
 [data-testid="stMetricValue"] {
     font-size: 2.2rem !important;
     font-weight: 800 !important;
@@ -163,6 +153,9 @@ with tab_dashboard:
     display_df = df[df["Player"] == current_user].copy()
     
     if not display_df.empty:
+        # 新增：对展示在页面上的数据强制按日期【从近到远】排序
+        display_df = display_df.sort_values(by="Date", ascending=False).reset_index(drop=True)
+        
         total_profit_cny = display_df["Profit_CNY"].sum()
         total_tourneys = len(display_df)
         itm_count = len(display_df[display_df["Cashed"] > 0])
@@ -176,7 +169,8 @@ with tab_dashboard:
         st.markdown("---")
         
         st.markdown(f"#### 📈 资金波动曲线")
-        df_sorted = display_df.sort_values(by="Date").reset_index(drop=True)
+        # 画图时必须按时间正序（从过去到现在）排列，否则曲线会乱套
+        df_sorted = display_df.sort_values(by="Date", ascending=True).reset_index(drop=True)
         df_daily = df_sorted.groupby("Date")["Profit_CNY"].sum().reset_index()
         df_daily["Cumulative_Profit"] = df_daily["Profit_CNY"].cumsum()
         
@@ -204,7 +198,11 @@ with tab_dashboard:
                 
             edited_df['Profit_CNY'] = edited_df.apply(recalc_profit, axis=1)
             other_users_df = df[df["Player"] != current_user]
+            
+            # 将修改后的个人数据与别人的数据合并
             final_df = pd.concat([other_users_df, edited_df], ignore_index=True)
+            # 新增：合并后，顺便把整个数据库都按日期降序排列，保持底层干净整洁
+            final_df = final_df.sort_values(by="Date", ascending=False) 
             final_df = final_df[["Date", "Player", "Location", "Buy_in", "Entries", "Cashed", "Currency", "Profit_CNY"]]
             
             sheet.clear()
@@ -227,7 +225,7 @@ with tab_entry:
             currency = st.selectbox("结算币种", CURRENCIES)
         with col2:
             historical_locations = df["Location"].dropna().unique().tolist() if not df.empty else []
-            default_locations = ["GGPoker 线上", "CoinPoker 线上"]
+            default_locations = ["GGPoker 线上"]
             all_locations = list(dict.fromkeys(default_locations + historical_locations))
             location_choice = st.selectbox("赛事地点", ["👇 手动新增地点..."] + all_locations)
             new_location = st.text_input("✍️ 新增地点", placeholder="若不在列表中，请在此输入")
