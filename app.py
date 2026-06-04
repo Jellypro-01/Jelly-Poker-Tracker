@@ -64,32 +64,35 @@ for c in ["USD", "AUD", "VND", "KRW"]:
 
 
 
-# ================= 侧边栏：简易计算器 =================
+# ================= 侧边栏：极简智能计算器 =================
 st.sidebar.markdown("---")
-st.sidebar.markdown("## 🧮 简易计算器")
-st.sidebar.caption("方便快速计算分摊买入或发牌员小费。")
+st.sidebar.markdown("## 🧮 智能计算器")
+st.sidebar.caption("支持混合运算，输入算式后按回车 ↵")
 
 with st.sidebar.container(border=True):
-    # 将计算器分为三列排版，显得紧凑
-    c1, c2, c3 = st.columns([2, 1, 2])
-    with c1:
-        n1 = st.number_input("数1", value=0.0, step=100.0, label_visibility="collapsed")
-    with c2:
-        op = st.selectbox("符号", ["+", "-", "×", "÷"], label_visibility="collapsed")
-    with c3:
-        n2 = st.number_input("数2", value=0.0, step=100.0, label_visibility="collapsed")
-        
-    # 计算逻辑
-    if op == "+": ans = n1 + n2
-    elif op == "-": ans = n1 - n2
-    elif op == "×": ans = n1 * n2
-    elif op == "÷": ans = n1 / n2 if n2 != 0 else "不能除以 0"
+    # 使用极简的单行输入框，取代拥挤的三个框
+    calc_expr = st.text_input(
+        "算式输入", 
+        value="", 
+        placeholder="例如输入: (1500+200)/3", 
+        label_visibility="collapsed"
+    )
     
-    # 显示结果
-    if isinstance(ans, float):
-        st.info(f"**结果 = {ans:,.2f}**")
-    else:
-        st.error(ans)
+    if calc_expr:
+        # 安全过滤：只允许数字和基础数学符号，防止乱码报错
+        allowed_chars = set("0123456789+-*/.() ")
+        if set(calc_expr).issubset(allowed_chars):
+            try:
+                # 核心魔法：自动解析并计算字符串算式
+                result = eval(calc_expr)
+                # 使用大字号和显眼的绿色底纹突出结果
+                st.success(f"### = {result:,.2f}")
+            except ZeroDivisionError:
+                st.error("❌ 错误：除数不能为 0")
+            except Exception:
+                st.error("❌ 算式有误，请检查格式")
+        else:
+            st.warning("⚠️ 仅支持数字和 + - * / ( ) 符号")
 
 # ================= 主体内容：使用标签页 (Tabs) =================
 st.title("🃏 Jelly Poker Dashboard")
