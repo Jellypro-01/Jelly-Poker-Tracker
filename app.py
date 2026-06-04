@@ -9,6 +9,25 @@ from google.oauth2.service_account import Credentials
 # ================= 1. 页面基础配置 =================
 st.set_page_config(page_title="Jelly Poker Tracker", page_icon="🃏", layout="wide")
 
+
+# ================= 1.5 极简私人密码锁 =================
+if "authenticated" not in st.session_state:
+    st.session_state.authenticated = False
+
+if not st.session_state.authenticated:
+    st.markdown("<h2 style='text-align: center; margin-top: 100px;'>🔒 Jelly Poker 私人金库</h2>", unsafe_allow_html=True)
+    col1, col2, col3 = st.columns([1, 2, 1])
+    with col2:
+        pwd = st.text_input("请输入访问密码", type="password", placeholder="输入暗号后按回车 ↵")
+        if pwd:
+            # 去保险柜里核对密码
+            if pwd == st.secrets["app_password"]:
+                st.session_state.authenticated = True
+                st.rerun()
+            else:
+                st.error("❌ 密码错误，非法入侵！")
+    # 如果没登录，直接切断程序，后面的代码全都不运行
+    st.stop()
 CURRENCIES = ["CNY", "USD", "AUD", "VND", "KRW"]
 
 # ================= 1.5 极简私人密码锁 =================
