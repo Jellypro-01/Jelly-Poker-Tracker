@@ -258,7 +258,7 @@ with tab_entry:
             
         with col2:
             historical_locations = df["Location"].dropna().unique().tolist() if not df.empty else []
-            default_locations = ["GGPoker 线上"]
+            default_locations = [""]
             all_locations = list(dict.fromkeys(default_locations + historical_locations))
             location_choice = st.selectbox("赛事地点", ["👇 手动新增地点..."] + all_locations)
             new_location = st.text_input("✍️ 新增地点", placeholder="若不在列表中，请在此输入")
