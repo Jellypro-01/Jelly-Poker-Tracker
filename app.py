@@ -84,9 +84,14 @@ except Exception as e:
 
 records = sheet.get_all_records()
 if not records:
-    df = pd.DataFrame(columns=["Date", "Player", "Location", "Buy_in", "Entries", "Cashed", "Currency", "Profit_CNY"])
+    # 增加 Format 列
+    df = pd.DataFrame(columns=["Date", "Player", "Format", "Location", "Buy_in", "Entries", "Cashed", "Currency", "Profit_CNY"])
 else:
     df = pd.DataFrame(records)
+    # 兼容处理：如果老数据没有 Format 列，自动补齐为锦标赛，防止报错
+    if "Format" not in df.columns:
+        df.insert(2, "Format", "🏆 锦标赛 (MTT)")
+        
     numeric_columns = ["Buy_in", "Entries", "Cashed", "Profit_CNY"]
     for col in numeric_columns:
         if col in df.columns:
@@ -144,7 +149,6 @@ with st.sidebar.expander("🧮 智能计算器", expanded=False):
             except:
                 st.error("算式有误")
 
-
 # ================= 5. 主体内容 (双标签页) =================
 tab_dashboard, tab_entry = st.tabs(["📊 数据看板", "➕ 记录赛事"])
 
@@ -155,18 +159,24 @@ with tab_dashboard:
     if not display_df.empty:
         display_df = display_df.sort_values(by="Date", ascending=False).reset_index(drop=True)
         
-        track_filter = st.radio(
-            "📍 赛道对比分析",
-            ["🌟 全部比赛", "💻 线上扑克 (Online)", "🏟️ 现场锦标赛 (Live)"],
-            horizontal=True
-        )
+        # 新增：双重筛选项 (赛道 + 类型)
+        st.markdown("#### 📍 深度交叉分析")
+        col_f1, col_f2 = st.columns(2)
+        with col_f1:
+            track_filter = st.radio("赛道", ["🌟 全部赛道", "💻 线上 (Online)", "🏟️ 现场 (Live)"], horizontal=True)
+        with col_f2:
+            format_filter = st.radio("类型", ["🌟 全部类型", "🏆 锦标赛 (MTT)", "💵 现金局 (Cash)"], horizontal=True)
         
-        if track_filter == "💻 线上扑克 (Online)":
-            calc_df = display_df[display_df["Location"].str.contains("线上|Online", na=False, case=False)].copy()
-        elif track_filter == "🏟️ 现场锦标赛 (Live)":
-            calc_df = display_df[~display_df["Location"].str.contains("线上|Online", na=False, case=False)].copy()
-        else:
-            calc_df = display_df.copy()
+        calc_df = display_df.copy()
+        
+        # 应用筛选逻辑
+        if track_filter == "💻 线上 (Online)":
+            calc_df = calc_df[calc_df["Location"].str.contains("线上|Online", na=False, case=False)]
+        elif track_filter == "🏟️ 现场 (Live)":
+            calc_df = calc_df[~calc_df["Location"].str.contains("线上|Online", na=False, case=False)]
+            
+        if format_filter != "🌟 全部类型":
+            calc_df = calc_df[calc_df["Format"] == format_filter]
             
         st.markdown("---")
         
@@ -177,9 +187,13 @@ with tab_dashboard:
             itm_rate = (itm_count / total_tourneys * 100) if total_tourneys > 0 else 0
             
             m1, m2, m3 = st.columns(3)
-            m1.metric("参赛总数", f"{total_tourneys} 场")
+            # 根据现金局或锦标赛动态改变文案
+            session_label = "记录场次" if format_filter == "💵 现金局 (Cash)" else "参赛总数"
+            win_rate_label = "盈利场次率 (Win%)" if format_filter == "💵 现金局 (Cash)" else "总进圈率 (ITM)"
+            
+            m1.metric(session_label, f"{total_tourneys} 场")
             m2.metric("总净利润 (RMB)", f"¥{total_profit_cny:,.2f}")
-            m3.metric("总进圈率 (ITM)", f"{itm_rate:.1f}%")
+            m3.metric(win_rate_label, f"{itm_rate:.1f}%")
                 
             st.markdown("#### 📈 资金波动曲线")
             df_sorted = calc_df.sort_values(by="Date", ascending=True).reset_index(drop=True)
@@ -189,7 +203,7 @@ with tab_dashboard:
             chart_data = df_daily.set_index("Date")[["Cumulative_Profit"]]
             st.line_chart(chart_data, color="#29b5e8", height=300)
         else:
-            st.info(f"📭 当前赛道 ({track_filter}) 暂无数据，快去打一场吧！")
+            st.info("📭 当前筛选条件下暂无数据，快去打一场吧！")
 
         st.markdown("---")
         st.markdown("#### 📋 完整详细记录")
@@ -216,7 +230,9 @@ with tab_dashboard:
             
             final_df = pd.concat([other_users_df, edited_df], ignore_index=True)
             final_df = final_df.sort_values(by="Date", ascending=False) 
-            final_df = final_df[["Date", "Player", "Location", "Buy_in", "Entries", "Cashed", "Currency", "Profit_CNY"]]
+            
+            # 确保 Format 列在重新上传时包含在内
+            final_df = final_df[["Date", "Player", "Format", "Location", "Buy_in", "Entries", "Cashed", "Currency", "Profit_CNY"]]
             
             sheet.clear()
             updated_data = [final_df.columns.values.tolist()] + final_df.values.tolist()
@@ -233,11 +249,12 @@ with tab_entry:
     with st.form("add_tournament_form", clear_on_submit=True):
         st.markdown("#### 📝 新赛事基础信息")
         
-        # 优化 1：时间与分类在一列，地点聚合在另一列
         col1, col2 = st.columns(2)
         with col1:
             date = st.date_input("比赛时间", datetime.date.today())
-            event_type = st.radio("赛事分类", ["💻 线上 (Online)", "🏟️ 现场 (Live)"], horizontal=True)
+            # 新增维度：线上/现场，MTT/Cash
+            event_track = st.radio("赛道分类", ["💻 线上 (Online)", "🏟️ 现场 (Live)"], horizontal=True)
+            game_format = st.radio("游戏类型", ["🏆 锦标赛 (MTT)", "💵 现金局 (Cash)"], horizontal=True)
             
         with col2:
             historical_locations = df["Location"].dropna().unique().tolist() if not df.empty else []
@@ -250,30 +267,30 @@ with tab_entry:
                 location = "未命名地点"
         
         st.markdown("---")
-        st.markdown("#### 💰 买入与战果")
+        st.markdown("#### 💰 资金战果")
         
-        # 优化 2：将币种调到前面，形成完美的 4 列资金流排版
         col3, col4, col5, col6 = st.columns(4)
         with col3:
             currency = st.selectbox("结算币种", CURRENCIES)
         with col4:
-            buy_in = st.number_input("单次买入", min_value=0.0, step=100.0)
+            buy_in = st.number_input("买入 (初始上桌)", min_value=0.0, step=100.0)
         with col5:
-            entries = st.number_input("买入次数", min_value=1, value=1, step=1)
+            # 锦标赛叫Entries，现金局就理解为买入的子弹数
+            entries = st.number_input("买入次数 (子弹数)", min_value=1, value=1, step=1)
         with col6:
-            cashed = st.number_input("最终总奖励", min_value=0.0, step=100.0)
+            cashed = st.number_input("最终结算 (退桌/奖金)", min_value=0.0, step=100.0)
             
         submitted = st.form_submit_button("🚀 录入并上云", use_container_width=True)
         
         if submitted:
-            # 智能补全：如果选了线上，但填的地点没带“线上”，自动带上后缀，防止看板筛选漏掉
-            if "线上" in event_type and not any(kw in location for kw in ["线上", "Online", "online"]):
+            if "线上" in event_track and not any(kw in location for kw in ["线上", "Online", "online"]):
                 location = f"{location} 线上"
                 
             profit_raw = cashed - (buy_in * entries)
             profit_cny = profit_raw * rates_cny_base[currency]
             
-            sheet.append_row([str(date), current_user, location, float(buy_in), int(entries), float(cashed), currency, float(profit_cny)])
-            st.success("✅ 完美！比赛记录已安全存入谷歌云端。")
+            # 将 format 插入到上传序列的正确位置
+            sheet.append_row([str(date), current_user, game_format, location, float(buy_in), int(entries), float(cashed), currency, float(profit_cny)])
+            st.success("✅ 完美！对局记录已安全存入谷歌云端。")
             time.sleep(1.5)
             st.rerun()
