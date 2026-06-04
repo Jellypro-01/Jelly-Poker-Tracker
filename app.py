@@ -153,32 +153,51 @@ with tab_dashboard:
     display_df = df[df["Player"] == current_user].copy()
     
     if not display_df.empty:
-        # 新增：对展示在页面上的数据强制按日期【从近到远】排序
+        # 对展示在页面上的数据强制按日期【从近到远】排序
         display_df = display_df.sort_values(by="Date", ascending=False).reset_index(drop=True)
         
-        total_profit_cny = display_df["Profit_CNY"].sum()
-        total_tourneys = len(display_df)
-        itm_count = len(display_df[display_df["Cashed"] > 0])
-        itm_rate = (itm_count / total_tourneys * 100) if total_tourneys > 0 else 0
+        # ====== 新增：线上 vs 现场 赛道筛选器 ======
+        track_filter = st.radio(
+            "📍 赛道对比分析",
+            ["🌟 全部比赛", "💻 线上扑克 (Online)", "🏟️ 现场锦标赛 (Live)"],
+            horizontal=True
+        )
         
-        m1, m2, m3 = st.columns(3)
-        m1.metric("参赛总数", f"{total_tourneys} 场")
-        m2.metric("总净利润 (RMB)", f"¥{total_profit_cny:,.2f}")
-        m3.metric("总进圈率 (ITM)", f"{itm_rate:.1f}%")
+        # 智能过滤逻辑
+        if track_filter == "💻 线上扑克 (Online)":
+            calc_df = display_df[display_df["Location"].str.contains("线上|Online", na=False, case=False)].copy()
+        elif track_filter == "🏟️ 现场锦标赛 (Live)":
+            calc_df = display_df[~display_df["Location"].str.contains("线上|Online", na=False, case=False)].copy()
+        else:
+            calc_df = display_df.copy()
             
         st.markdown("---")
         
-        st.markdown(f"#### 📈 资金波动曲线")
-        # 画图时必须按时间正序（从过去到现在）排列，否则曲线会乱套
-        df_sorted = display_df.sort_values(by="Date", ascending=True).reset_index(drop=True)
-        df_daily = df_sorted.groupby("Date")["Profit_CNY"].sum().reset_index()
-        df_daily["Cumulative_Profit"] = df_daily["Profit_CNY"].cumsum()
-        
-        chart_data = df_daily.set_index("Date")[["Cumulative_Profit"]]
-        st.line_chart(chart_data, color="#29b5e8", height=300)
+        if not calc_df.empty:
+            total_profit_cny = calc_df["Profit_CNY"].sum()
+            total_tourneys = len(calc_df)
+            itm_count = len(calc_df[calc_df["Cashed"] > 0])
+            itm_rate = (itm_count / total_tourneys * 100) if total_tourneys > 0 else 0
+            
+            m1, m2, m3 = st.columns(3)
+            m1.metric("参赛总数", f"{total_tourneys} 场")
+            m2.metric("总净利润 (RMB)", f"¥{total_profit_cny:,.2f}")
+            m3.metric("总进圈率 (ITM)", f"{itm_rate:.1f}%")
+                
+            st.markdown("#### 📈 资金波动曲线")
+            # 画图时必须按时间正序（从过去到现在）排列
+            df_sorted = calc_df.sort_values(by="Date", ascending=True).reset_index(drop=True)
+            df_daily = df_sorted.groupby("Date")["Profit_CNY"].sum().reset_index()
+            df_daily["Cumulative_Profit"] = df_daily["Profit_CNY"].cumsum()
+            
+            chart_data = df_daily.set_index("Date")[["Cumulative_Profit"]]
+            st.line_chart(chart_data, color="#29b5e8", height=300)
+        else:
+            st.info(f"📭 当前赛道 ({track_filter}) 暂无数据，快去打一场吧！")
 
-        st.markdown("#### 📋 详细记录")
-        st.caption("💡 电脑端可双击单元格直接修改，选中左侧方框按 Delete 键删除。")
+        st.markdown("---")
+        st.markdown("#### 📋 完整详细记录")
+        st.caption("💡 电脑端可双击直接修改，选中左侧方框按 Delete 键删除 (此处固定显示全部记录，防止误删)。")
         edited_df = st.data_editor(
             display_df,
             use_container_width=True,
@@ -199,9 +218,8 @@ with tab_dashboard:
             edited_df['Profit_CNY'] = edited_df.apply(recalc_profit, axis=1)
             other_users_df = df[df["Player"] != current_user]
             
-            # 将修改后的个人数据与别人的数据合并
+            # 将修改后的个人数据与别人的数据合并，并按日期降序排列
             final_df = pd.concat([other_users_df, edited_df], ignore_index=True)
-            # 新增：合并后，顺便把整个数据库都按日期降序排列，保持底层干净整洁
             final_df = final_df.sort_values(by="Date", ascending=False) 
             final_df = final_df[["Date", "Player", "Location", "Buy_in", "Entries", "Cashed", "Currency", "Profit_CNY"]]
             
@@ -228,7 +246,7 @@ with tab_entry:
             default_locations = ["GGPoker 线上"]
             all_locations = list(dict.fromkeys(default_locations + historical_locations))
             location_choice = st.selectbox("赛事地点", ["👇 手动新增地点..."] + all_locations)
-            new_location = st.text_input("✍️ 新增地点", placeholder="若不在列表中，请在此输入")
+            new_location = st.text_input("✍️ 新增地点", placeholder="若不在列表中，请在此输入 (包含'线上'二字会自动归类)")
             location = new_location.strip() if new_location.strip() != "" else location_choice
             if location == "👇 手动新增地点...":
                 location = "未命名地点"
