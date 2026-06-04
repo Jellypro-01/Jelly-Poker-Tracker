@@ -84,11 +84,9 @@ except Exception as e:
 
 records = sheet.get_all_records()
 if not records:
-    # 增加 Format 列
     df = pd.DataFrame(columns=["Date", "Player", "Format", "Location", "Buy_in", "Entries", "Cashed", "Currency", "Profit_CNY"])
 else:
     df = pd.DataFrame(records)
-    # 兼容处理：如果老数据没有 Format 列，自动补齐为锦标赛，防止报错
     if "Format" not in df.columns:
         df.insert(2, "Format", "🏆 锦标赛 (MTT)")
         
@@ -159,7 +157,6 @@ with tab_dashboard:
     if not display_df.empty:
         display_df = display_df.sort_values(by="Date", ascending=False).reset_index(drop=True)
         
-        # 新增：双重筛选项 (赛道 + 类型)
         st.markdown("#### 📍 深度交叉分析")
         col_f1, col_f2 = st.columns(2)
         with col_f1:
@@ -169,7 +166,6 @@ with tab_dashboard:
         
         calc_df = display_df.copy()
         
-        # 应用筛选逻辑
         if track_filter == "💻 线上 (Online)":
             calc_df = calc_df[calc_df["Location"].str.contains("线上|Online", na=False, case=False)]
         elif track_filter == "🏟️ 现场 (Live)":
@@ -187,7 +183,6 @@ with tab_dashboard:
             itm_rate = (itm_count / total_tourneys * 100) if total_tourneys > 0 else 0
             
             m1, m2, m3 = st.columns(3)
-            # 根据现金局或锦标赛动态改变文案
             session_label = "记录场次" if format_filter == "💵 现金局 (Cash)" else "参赛总数"
             win_rate_label = "盈利场次率 (Win%)" if format_filter == "💵 现金局 (Cash)" else "总进圈率 (ITM)"
             
@@ -230,8 +225,6 @@ with tab_dashboard:
             
             final_df = pd.concat([other_users_df, edited_df], ignore_index=True)
             final_df = final_df.sort_values(by="Date", ascending=False) 
-            
-            # 确保 Format 列在重新上传时包含在内
             final_df = final_df[["Date", "Player", "Format", "Location", "Buy_in", "Entries", "Cashed", "Currency", "Profit_CNY"]]
             
             sheet.clear()
@@ -252,13 +245,12 @@ with tab_entry:
         col1, col2 = st.columns(2)
         with col1:
             date = st.date_input("比赛时间", datetime.date.today())
-            # 新增维度：线上/现场，MTT/Cash
             event_track = st.radio("赛道分类", ["💻 线上 (Online)", "🏟️ 现场 (Live)"], horizontal=True)
             game_format = st.radio("游戏类型", ["🏆 锦标赛 (MTT)", "💵 现金局 (Cash)"], horizontal=True)
             
         with col2:
             historical_locations = df["Location"].dropna().unique().tolist() if not df.empty else []
-            default_locations = [""]
+            default_locations = ["GGPoker 线上"]
             all_locations = list(dict.fromkeys(default_locations + historical_locations))
             location_choice = st.selectbox("赛事地点", ["👇 手动新增地点..."] + all_locations)
             new_location = st.text_input("✍️ 新增地点", placeholder="若不在列表中，请在此输入")
@@ -275,7 +267,6 @@ with tab_entry:
         with col4:
             buy_in = st.number_input("买入 (初始上桌)", min_value=0.0, step=100.0)
         with col5:
-            # 锦标赛叫Entries，现金局就理解为买入的子弹数
             entries = st.number_input("买入次数 (子弹数)", min_value=1, value=1, step=1)
         with col6:
             cashed = st.number_input("最终结算 (退桌/奖金)", min_value=0.0, step=100.0)
@@ -289,8 +280,53 @@ with tab_entry:
             profit_raw = cashed - (buy_in * entries)
             profit_cny = profit_raw * rates_cny_base[currency]
             
-            # 将 format 插入到上传序列的正确位置
             sheet.append_row([str(date), current_user, game_format, location, float(buy_in), int(entries), float(cashed), currency, float(profit_cny)])
             st.success("✅ 完美！对局记录已安全存入谷歌云端。")
             time.sleep(1.5)
             st.rerun()
+
+    # --- 新增：智能地点清理大师 ---
+    st.markdown("---")
+    with st.expander("🛠️ 管理与清理下拉菜单地点", expanded=False):
+        st.markdown("#### 🧹 下拉菜单清理大师")
+        st.caption("菜单地点是根据历史记录自动生成的。如果你想剔除错别字或废弃地点，请在这里操作。")
+        
+        if historical_locations:
+            col_m1, col_m2 = st.columns(2)
+            with col_m1:
+                target_loc = st.selectbox("选择要处理的废弃地点", historical_locations, key="target_loc_clean")
+            with col_m2:
+                replace_loc = st.text_input("修正重命名为 (留空则不修改)", placeholder="输入正确的地点名称")
+                
+            col_b1, col_b2 = st.columns(2)
+            with col_b1:
+                if st.button("🔄 一键批量重命名", use_container_width=True):
+                    if replace_loc.strip() != "" and target_loc:
+                        df.loc[df["Location"] == target_loc, "Location"] = replace_loc.strip()
+                        final_df = df.sort_values(by="Date", ascending=False)
+                        final_df = final_df[["Date", "Player", "Format", "Location", "Buy_in", "Entries", "Cashed", "Currency", "Profit_CNY"]]
+                        sheet.clear()
+                        updated_data = [final_df.columns.values.tolist()] + final_df.values.tolist()
+                        sheet.update(values=updated_data, range_name="A1")
+                        st.success(f"✅ 成功！已将所有 '{target_loc}' 纠正为 '{replace_loc}'。")
+                        time.sleep(1.5)
+                        st.rerun()
+                    else:
+                        st.warning("⚠️ 请先在右侧输入你要修改成的正确地点名称！")
+            with col_b2:
+                if st.button("🗑️ 危险：删除该地点及相关所有对局", type="primary", use_container_width=True):
+                    if target_loc:
+                        final_df = df[df["Location"] != target_loc].copy()
+                        final_df = final_df.sort_values(by="Date", ascending=False)
+                        final_df = final_df[["Date", "Player", "Format", "Location", "Buy_in", "Entries", "Cashed", "Currency", "Profit_CNY"]]
+                        sheet.clear()
+                        if not final_df.empty:
+                            updated_data = [final_df.columns.values.tolist()] + final_df.values.tolist()
+                            sheet.update(values=updated_data, range_name="A1")
+                        else:
+                            sheet.update(values=[final_df.columns.values.tolist()], range_name="A1")
+                        st.success(f"✅ 彻底清理完毕！已删除 '{target_loc}' 及它对应的所有历史记录。")
+                        time.sleep(1.5)
+                        st.rerun()
+        else:
+            st.info("当前还没有任何历史地点可以清理。")
