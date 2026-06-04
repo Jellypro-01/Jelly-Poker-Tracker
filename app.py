@@ -63,6 +63,34 @@ for c in ["USD", "AUD", "VND", "KRW"]:
     st.sidebar.text(f"1 {c} ≈ {rates_cny_base[c]:,.4f} CNY")
 
 
+
+# ================= 侧边栏：简易计算器 =================
+st.sidebar.markdown("---")
+st.sidebar.markdown("## 🧮 简易计算器")
+st.sidebar.caption("方便快速计算分摊买入或发牌员小费。")
+
+with st.sidebar.container(border=True):
+    # 将计算器分为三列排版，显得紧凑
+    c1, c2, c3 = st.columns([2, 1, 2])
+    with c1:
+        n1 = st.number_input("数1", value=0.0, step=100.0, label_visibility="collapsed")
+    with c2:
+        op = st.selectbox("符号", ["+", "-", "×", "÷"], label_visibility="collapsed")
+    with c3:
+        n2 = st.number_input("数2", value=0.0, step=100.0, label_visibility="collapsed")
+        
+    # 计算逻辑
+    if op == "+": ans = n1 + n2
+    elif op == "-": ans = n1 - n2
+    elif op == "×": ans = n1 * n2
+    elif op == "÷": ans = n1 / n2 if n2 != 0 else "不能除以 0"
+    
+    # 显示结果
+    if isinstance(ans, float):
+        st.info(f"**结果 = {ans:,.2f}**")
+    else:
+        st.error(ans)
+
 # ================= 主体内容：使用标签页 (Tabs) =================
 st.title("🃏 Jelly Poker Dashboard")
 st.markdown("---")
