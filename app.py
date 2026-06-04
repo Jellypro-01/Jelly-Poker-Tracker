@@ -61,7 +61,7 @@ if not st.session_state.authenticated:
     
     col1, col2, col3 = st.columns([1, 2, 1])
     with col2:
-        username = st.text_input("请输入专属 ID (首次输入自动注册)", placeholder="例如: Jelly", label_visibility="collapsed")
+        username = st.text_input("请输入专属 ID (首次输入自动注册)", placeholder="例如: Tom Dwan", label_visibility="collapsed")
         if st.button("进入金库", use_container_width=True, type="primary"):
             if username.strip() != "":
                 st.session_state.authenticated = True
