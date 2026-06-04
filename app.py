@@ -48,7 +48,7 @@ if "authenticated" not in st.session_state:
 
 if not st.session_state.authenticated:
     st.markdown("<h1 style='text-align: center; margin-top: 15vh; font-size: 3rem;'>🃏 Jelly Poker</h1>", unsafe_allow_html=True)
-    st.markdown("<p style='text-align: center; color: #64748B; margin-bottom: 2rem;'>你的云端专属扑克管家</p>", unsafe_allow_html=True)
+    st.markdown("<p style='text-align: center; color: #64748B; margin-bottom: 2rem;'>你的云端专属扑克资金管家</p>", unsafe_allow_html=True)
     
     col1, col2, col3 = st.columns([1, 2, 1])
     with col2:
@@ -153,17 +153,14 @@ with tab_dashboard:
     display_df = df[df["Player"] == current_user].copy()
     
     if not display_df.empty:
-        # 对展示在页面上的数据强制按日期【从近到远】排序
         display_df = display_df.sort_values(by="Date", ascending=False).reset_index(drop=True)
         
-        # ====== 新增：线上 vs 现场 赛道筛选器 ======
         track_filter = st.radio(
             "📍 赛道对比分析",
             ["🌟 全部比赛", "💻 线上扑克 (Online)", "🏟️ 现场锦标赛 (Live)"],
             horizontal=True
         )
         
-        # 智能过滤逻辑
         if track_filter == "💻 线上扑克 (Online)":
             calc_df = display_df[display_df["Location"].str.contains("线上|Online", na=False, case=False)].copy()
         elif track_filter == "🏟️ 现场锦标赛 (Live)":
@@ -185,7 +182,6 @@ with tab_dashboard:
             m3.metric("总进圈率 (ITM)", f"{itm_rate:.1f}%")
                 
             st.markdown("#### 📈 资金波动曲线")
-            # 画图时必须按时间正序（从过去到现在）排列
             df_sorted = calc_df.sort_values(by="Date", ascending=True).reset_index(drop=True)
             df_daily = df_sorted.groupby("Date")["Profit_CNY"].sum().reset_index()
             df_daily["Cumulative_Profit"] = df_daily["Profit_CNY"].cumsum()
@@ -218,7 +214,6 @@ with tab_dashboard:
             edited_df['Profit_CNY'] = edited_df.apply(recalc_profit, axis=1)
             other_users_df = df[df["Player"] != current_user]
             
-            # 将修改后的个人数据与别人的数据合并，并按日期降序排列
             final_df = pd.concat([other_users_df, edited_df], ignore_index=True)
             final_df = final_df.sort_values(by="Date", ascending=False) 
             final_df = final_df[["Date", "Player", "Location", "Buy_in", "Entries", "Cashed", "Currency", "Profit_CNY"]]
@@ -237,33 +232,44 @@ with tab_dashboard:
 with tab_entry:
     with st.form("add_tournament_form", clear_on_submit=True):
         st.markdown("#### 📝 新赛事基础信息")
+        
+        # 优化 1：时间与分类在一列，地点聚合在另一列
         col1, col2 = st.columns(2)
         with col1:
             date = st.date_input("比赛时间", datetime.date.today())
-            currency = st.selectbox("结算币种", CURRENCIES)
+            event_type = st.radio("赛事分类", ["💻 线上 (Online)", "🏟️ 现场 (Live)"], horizontal=True)
+            
         with col2:
             historical_locations = df["Location"].dropna().unique().tolist() if not df.empty else []
             default_locations = ["GGPoker 线上"]
             all_locations = list(dict.fromkeys(default_locations + historical_locations))
             location_choice = st.selectbox("赛事地点", ["👇 手动新增地点..."] + all_locations)
-            new_location = st.text_input("✍️ 新增地点", placeholder="若不在列表中，请在此输入 (包含'线上'二字会自动归类)")
+            new_location = st.text_input("✍️ 新增地点", placeholder="若不在列表中，请在此输入")
             location = new_location.strip() if new_location.strip() != "" else location_choice
             if location == "👇 手动新增地点...":
                 location = "未命名地点"
         
         st.markdown("---")
         st.markdown("#### 💰 买入与战果")
-        col3, col4, col5 = st.columns(3)
+        
+        # 优化 2：将币种调到前面，形成完美的 4 列资金流排版
+        col3, col4, col5, col6 = st.columns(4)
         with col3:
-            buy_in = st.number_input("单次买入", min_value=0.0, step=100.0)
+            currency = st.selectbox("结算币种", CURRENCIES)
         with col4:
-            entries = st.number_input("买入次数", min_value=1, value=1, step=1)
+            buy_in = st.number_input("单次买入", min_value=0.0, step=100.0)
         with col5:
+            entries = st.number_input("买入次数", min_value=1, value=1, step=1)
+        with col6:
             cashed = st.number_input("最终总奖励", min_value=0.0, step=100.0)
             
         submitted = st.form_submit_button("🚀 录入并上云", use_container_width=True)
         
         if submitted:
+            # 智能补全：如果选了线上，但填的地点没带“线上”，自动带上后缀，防止看板筛选漏掉
+            if "线上" in event_type and not any(kw in location for kw in ["线上", "Online", "online"]):
+                location = f"{location} 线上"
+                
             profit_raw = cashed - (buy_in * entries)
             profit_cny = profit_raw * rates_cny_base[currency]
             
