@@ -88,7 +88,7 @@ with tab_entry:
         with col1:
             date = st.date_input("比赛时间", datetime.date.today())
             historical_locations = df["Location"].dropna().unique().tolist() if not df.empty else []
-            default_locations = ["GGPoker 线上", "CoinPoker 线上", "Natural8 线上", "拉斯维加斯 (WSOP)", "墨尔本 Crown (Aussie Millions)"]
+            default_locations = ["GGPoker 线上"]
             all_locations = list(dict.fromkeys(default_locations + historical_locations))
             
             location_choice = st.selectbox("赛事地点 (下拉选择)", ["👇 我要手动输入新地点..."] + all_locations)
